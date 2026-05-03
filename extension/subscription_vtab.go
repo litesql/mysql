@@ -13,8 +13,9 @@ import (
 	"time"
 
 	"github.com/go-mysql-org/go-mysql/mysql"
-	"github.com/litesql/mysql/replication"
 	"github.com/walterwanderley/sqlite"
+
+	"github.com/litesql/mysql/replication"
 )
 
 type ReplicationType int
@@ -154,14 +155,17 @@ func (vt *SubscriptionVirtualTable) Insert(values ...sqlite.Value) (int64, error
 	if err != nil {
 		return 0, err
 	}
-	err = subscription.Start(vt.logger, vt.loader(localhost))
-	if err != nil {
-		return 0, err
-	}
 	vt.subscriptions = append(vt.subscriptions, &subscriptionItem{
 		Subscription:    subscription,
 		replicationType: replType,
 	})
+
+	go func() {
+		err := subscription.Start(vt.logger, vt.loader(localhost))
+		if err != nil {
+			vt.logger.Error("failed to subscribe", "error", err)
+		}
+	}()
 
 	return 1, nil
 }
@@ -199,28 +203,29 @@ func (vt *SubscriptionVirtualTable) contains(localhost string) bool {
 	return false
 }
 
-func (vt *SubscriptionVirtualTable) loader(slot string) replication.CheckpointLoader {
+func (vt *SubscriptionVirtualTable) loader(localhost string) replication.CheckpointLoader {
 	return func() (mysql.Position, error) {
 		err := vt.loadPositionStmt.Reset()
 		if err != nil {
 			return mysql.Position{}, err
 		}
-		vt.loadPositionStmt.BindText(1, slot)
+		vt.loadPositionStmt.BindText(1, localhost)
 		hasRow, err := vt.loadPositionStmt.Step()
 		if err != nil {
-			return mysql.Position{}, fmt.Errorf("loading last position for localhost %q: %w", slot, err)
+			return mysql.Position{}, fmt.Errorf("loading last position for localhost %q: %w", localhost, err)
 		}
 		if hasRow {
 			positionStr := vt.loadPositionStmt.ColumnText(0)
 			var position mysql.Position
 			err := json.Unmarshal([]byte(positionStr), &position)
 			if err != nil {
-				return mysql.Position{}, fmt.Errorf("parsing last position %q for slot %q: %w", positionStr, slot, err)
+				return mysql.Position{}, fmt.Errorf("parsing last position %q for localhost %q: %w", positionStr, localhost, err)
 			}
-			vt.logger.Info("loaded last saved position", "slot", slot, "position", position)
+			vt.logger.Info("loaded last saved position", "localhost", localhost, "position", position)
 			return position, nil
 		}
 		return mysql.Position{}, fmt.Errorf("no checkpoint found")
+
 	}
 }
 
@@ -230,7 +235,6 @@ func (vt *SubscriptionVirtualTable) handler(localhost string, replType Replicati
 		defer vt.stmtMu.Unlock()
 
 		vt.logger.Debug("applying changeset", "localhost", localhost, "current_position", currentPosition)
-
 		err := vt.conn.Exec("BEGIN IMMEDIATE", nil)
 		if err != nil {
 			return err
@@ -336,7 +340,14 @@ func (vt *SubscriptionVirtualTable) handler(localhost string, replType Replicati
 				return fmt.Errorf("inserting history record: %w", err)
 			}
 		}
-		return vt.conn.Exec("COMMIT", nil)
+
+		err = vt.conn.Exec("COMMIT", nil)
+		if err != nil {
+			vt.logger.Error("commit changeset", "position", currentPosition, "error", err)
+			return err
+		}
+
+		return nil
 	}
 }
 

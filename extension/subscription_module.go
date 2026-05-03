@@ -66,10 +66,10 @@ func (m *SubscriptionModule) Connect(conn *sqlite.Conn, args []string, declare f
 
 	err = conn.Exec(fmt.Sprintf(
 		`CREATE TABLE IF NOT EXISTS %s(
-	localhost TEXT PRIMARY KEY,
-	position TEXT,
-	server_time TEXT
-)`, positionTrackerTable), nil)
+		   	localhost TEXT PRIMARY KEY,
+		   	position TEXT,
+		   	server_time TEXT
+		   )`, positionTrackerTable), nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating %q table: %w", positionTrackerTable, err)
 	}
@@ -77,12 +77,12 @@ func (m *SubscriptionModule) Connect(conn *sqlite.Conn, args []string, declare f
 	historyTable := "mysql_history"
 	err = conn.Exec(fmt.Sprintf(
 		`CREATE TABLE IF NOT EXISTS %s(
-	seq INTEGER PRIMARY KEY AUTOINCREMENT,
-	localhost TEXT,
-	position TEXT,
-	server_time TEXT,
-	changeset JSONB
-)`, historyTable), nil)
+		   	seq INTEGER PRIMARY KEY AUTOINCREMENT,
+		   	localhost TEXT,
+		   	position TEXT,
+		   	server_time TEXT,
+		   	changeset JSONB
+		   )`, historyTable), nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating %q table: %w", positionTrackerTable, err)
 	}

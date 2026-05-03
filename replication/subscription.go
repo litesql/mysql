@@ -136,11 +136,7 @@ func (h *eventHandler) OnRow(e *canal.RowsEvent) error {
 	}
 	if _, ok := h.relations[fullname]; !ok {
 		h.relations[fullname] = struct{}{}
-		ddl := createTableDDL(fullname, e.Table)
-		h.changes = append(h.changes, Change{
-			Kind: "SQL",
-			SQL:  ddl,
-		})
+		h.changes = append(h.changes, createTableDDL(fullname, e.Table)...)
 	}
 
 	var change Change
@@ -207,7 +203,8 @@ func (h *eventHandler) OnPosSynced(header *replication.EventHeader, pos mysql.Po
 	return h.handleFn(h.changes, pos)
 }
 
-func createTableDDL(fullname string, table *schema.Table) string {
+func createTableDDL(fullname string, table *schema.Table) []Change {
+	var changeset []Change
 	var buf strings.Builder
 	buf.WriteString("CREATE TABLE IF NOT EXISTS ")
 	fmt.Fprintf(&buf, "`%s`(\n", fullname)
@@ -228,14 +225,24 @@ func createTableDDL(fullname string, table *schema.Table) string {
 		}
 		buf.WriteString(")\n")
 	}
-	buf.WriteString(");")
+	buf.WriteString(")")
+
+	changeset = append(changeset, Change{
+		Kind: "SQL",
+		SQL:  buf.String(),
+	})
 
 	for _, index := range table.Indexes {
-		fmt.Fprintf(&buf, "\nCREATE INDEX IF NOT EXISTS `%s`\n", index.Name)
-		fmt.Fprintf(&buf, "ON `%s`(%s);", fullname, strings.Join(index.Columns, ", "))
+		var buf strings.Builder
+		fmt.Fprintf(&buf, "CREATE INDEX IF NOT EXISTS `%s`\n", index.Name)
+		fmt.Fprintf(&buf, "\tON `%s`(%s)", fullname, strings.Join(index.Columns, ", "))
+		changeset = append(changeset, Change{
+			Kind: "SQL",
+			SQL:  buf.String(),
+		})
 	}
 
-	return buf.String()
+	return changeset
 }
 
 func toSqliteType(typ int) string {
