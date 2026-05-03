@@ -1,0 +1,19 @@
+{
+    "owner": "litesql",
+    "name": "mysql",
+    "version": "v0.0.1",
+    "repository": "https://github.com/litesql/mysql",
+    "authors": ["Walter Wanderley"],
+    "license": "MIT",
+    "description": "SQLite extension to replicate data from MySQL or MariaDB",
+    "symbols": ["mysql_sub", "mysql_sub_stat", "mysql_undo"],
+    "assets": {
+        "files": {
+            "darwin-amd64": "mysql_{version}_Darwin_x86_64.tar.gz",
+            "darwin-arm64": "mysql_{version}_Darwin_arm64.tar.gz",
+            "linux-amd64": "mysql_{version}_Linux_x86_64.tar.gz",
+            "linux-arm64": "mysql_{version}_Linux_arm64.tar.gz",
+            "windows-amd64": "mysql_{version}_Windows_x86_64.zip"
+        }
+    }
+}

@@ -1,2 +1,2 @@
 # mysql
-SQLite extension to replicate MySQL
+SQLite extension to replicate MySQL or MariaDB
