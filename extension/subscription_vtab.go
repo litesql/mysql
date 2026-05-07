@@ -135,7 +135,6 @@ func (vt *SubscriptionVirtualTable) Insert(values ...sqlite.Value) (int64, error
 		DumpExecutionPath:  vt.dumpExecutionPath,
 		DumpDB:             vt.dumpDB,
 		DumpTables:         vt.dumpTables,
-		Logger:             vt.logger,
 	}
 
 	vt.mu.Lock()
@@ -161,7 +160,7 @@ func (vt *SubscriptionVirtualTable) Insert(values ...sqlite.Value) (int64, error
 	})
 
 	go func() {
-		err := subscription.Start(vt.logger, vt.loader(localhost))
+		err := subscription.Start(vt.logger, vt.loader(localhost), false)
 		if err != nil {
 			vt.logger.Error("failed to subscribe", "error", err)
 		}

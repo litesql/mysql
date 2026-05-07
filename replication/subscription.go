@@ -24,12 +24,15 @@ type Config struct {
 	DumpExecutionPath  string
 	DumpDB             string
 	DumpTables         []string
-	Logger             *slog.Logger
+	Timeout            time.Duration
 }
 
 type Subscription struct {
-	cfg   Config
-	canal *canal.Canal
+	cfg          Config
+	canalCfg     *canal.Config
+	canal        *canal.Canal
+	eventHandler canal.EventHandler
+	stopped      bool
 }
 
 func Subscribe(cfg Config, handler HandleChanges, useNamespace bool) (*Subscription, error) {
@@ -59,9 +62,6 @@ func Subscribe(cfg Config, handler HandleChanges, useNamespace bool) (*Subscript
 	canalCfg.Dump.ExecutionPath = cfg.DumpExecutionPath
 	canalCfg.Dump.TableDB = cfg.DumpDB
 	canalCfg.Dump.Tables = cfg.DumpTables
-	if cfg.Logger != nil {
-		canalCfg.Logger = cfg.Logger
-	}
 
 	eventHandler := eventHandler{
 		handleFn:     handler,
@@ -70,16 +70,14 @@ func Subscribe(cfg Config, handler HandleChanges, useNamespace bool) (*Subscript
 		relations:    make(map[string]struct{}),
 	}
 
-	canal, err := canal.NewCanal(canalCfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize Canal: %w", err)
+	if cfg.Timeout == 0 {
+		cfg.Timeout = 10 * time.Second
 	}
 
-	canal.SetEventHandler(&eventHandler)
-
 	return &Subscription{
-		cfg:   cfg,
-		canal: canal,
+		cfg:          cfg,
+		canalCfg:     canalCfg,
+		eventHandler: &eventHandler,
 	}, nil
 }
 
@@ -103,19 +101,52 @@ func (s *Subscription) DumpExecutionPath() string {
 	return s.cfg.DumpExecutionPath
 }
 
-func (s *Subscription) Start(logger *slog.Logger, loadCheckpoint CheckpointLoader) error {
+func (s *Subscription) Start(logger *slog.Logger, loadCheckpoint CheckpointLoader, retry bool) error {
+	if s.stopped == true {
+		return nil
+	}
+	canal, err := canal.NewCanal(s.canalCfg)
+	if err != nil {
+		if retry {
+			logger.Warn("failed to initialize canal, will retry", "timeout", s.cfg.Timeout, "error", err)
+			time.Sleep(s.cfg.Timeout)
+			return s.Start(logger, loadCheckpoint, retry)
+		}
+		return fmt.Errorf("failed to initialize Canal: %w", err)
+	}
+	canal.SetEventHandler(s.eventHandler)
+	s.canal = canal
+
 	currentPosition, err := loadCheckpoint()
 	if err != nil {
 		logger.Warn("failed to load previous position, starting from beginning", "error", err)
-		return s.canal.Run()
+		err := s.canal.Run()
+		if err != nil {
+			if retry {
+				logger.Warn("subscription error, will retry", "timeout", s.cfg.Timeout, "error", err)
+				time.Sleep(s.cfg.Timeout)
+				return s.Start(logger, loadCheckpoint, retry)
+			}
+			return err
+		}
 	}
 
 	logger.Info("Starting replication", "position", currentPosition)
-	return s.canal.RunFrom(currentPosition)
+	err = s.canal.RunFrom(currentPosition)
+	if err != nil {
+		if retry {
+			logger.Warn("subscription error, will retry", "timeout", s.cfg.Timeout, "error", err)
+			time.Sleep(s.cfg.Timeout)
+			return s.Start(logger, loadCheckpoint, retry)
+		}
+		return err
+	}
+	return nil
 }
 
 func (s *Subscription) Stop() {
 	if s.canal != nil {
+		s.stopped = true
 		s.canal.Close()
 	}
 }
