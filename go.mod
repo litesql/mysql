@@ -3,7 +3,7 @@ module github.com/litesql/mysql
 go 1.25.0
 
 require (
-	github.com/go-mysql-org/go-mysql v1.14.0
+	github.com/go-mysql-org/go-mysql v1.15.0
 	github.com/walterwanderley/sqlite v0.0.0-20250807085442-1c89b916e683
 )
 
@@ -15,14 +15,14 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/klauspost/compress v1.18.6 // indirect
 	github.com/mattn/go-pointer v0.0.1 // indirect
-	github.com/pingcap/errors v0.11.5-0.20260310054046-9c8b3586e4b2 // indirect
+	github.com/pingcap/errors v0.11.5-0.20260508054701-306e305bcf41 // indirect
 	github.com/pingcap/failpoint v0.0.0-20260406204437-bbc9d102c19e // indirect
 	github.com/pingcap/log v1.1.1-0.20260227082333-572e590d08f1 // indirect
-	github.com/pingcap/tidb/pkg/parser v0.0.0-20260501060436-33ae9e3cb52f // indirect
+	github.com/pingcap/tidb/pkg/parser v0.0.0-20260508113557-84548dbcc173 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.28.0 // indirect
-	golang.org/x/text v0.36.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 )
